@@ -29,8 +29,9 @@ http://stackoverflow.com/a/20686267/424124
 
 ## Contact
 
-
+Josh Baker [@tidwall](https://twitter.com/tidwall)
 Aviad Sachs [@zaxy78](http://github.com/zaxy78)
+
 
 ## License
 
