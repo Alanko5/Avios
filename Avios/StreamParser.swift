@@ -70,7 +70,7 @@ public class StreamParser {
     
     
     fileprivate func findNextStartCode(_ dataBuffer: UnsafeBufferPointer<UInt8>, from index : Int) -> Int {
-        guard index >= 0 && index < (dataBuffer.count - 3) else { return dataBuffer.count }
+        guard index >= 0 && index < (dataBuffer.count - self.startCode) else { return dataBuffer.count }
         
         var i = index + 1
         while !isStartCodeIn(dataBuffer, at: i) {
@@ -85,7 +85,7 @@ public class StreamParser {
     
     
     fileprivate func isStartCodeIn(_ dataBuffer: UnsafeBufferPointer<UInt8>, at index : Int) -> Bool {
-        guard index < dataBuffer.count - 3 else { return false }
+        guard index < dataBuffer.count - self.startCode else { return false }
         
         if dataBuffer[index] == 0x00 && dataBuffer[index+1] == 0x00 {
             switch self.startCode {
