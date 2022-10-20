@@ -50,9 +50,9 @@ open class NALU {
     fileprivate var bblen  = [UInt8](repeating: 0, count: 8)
 
     fileprivate var copied = false
-    open let buffer : UnsafeBufferPointer<UInt8>
-    open let type : NALUType
-    open let priority : Int
+    public let buffer : UnsafeBufferPointer<UInt8>
+    public let type : NALUType
+    public let priority : Int
     public init(_ buffer: UnsafeBufferPointer<UInt8>) {
         var type : NALUType?
         var priority : Int?
@@ -109,17 +109,17 @@ open class NALU {
         var biglen = CFSwapInt32HostToBig(UInt32(buffer.count))
         memcpy(&bblen, &biglen, 4)
         var _buffer : CMBlockBuffer?
-        var status = CMBlockBufferCreateWithMemoryBlock(nil, &bblen, 4, kCFAllocatorNull, nil, 0, 4, 0, &_buffer)
+        var status = CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: &bblen, blockLength: 4, blockAllocator: kCFAllocatorNull, customBlockSource: nil, offsetToData: 0, dataLength: 4, flags: 0, blockBufferOut: &_buffer)
         if status != noErr {
             throw H264Error.cmBlockBufferCreateWithMemoryBlock(status)
         }
         var bufferData : CMBlockBuffer?
-        status = CMBlockBufferCreateWithMemoryBlock(nil, UnsafeMutablePointer<UInt8>(mutating: buffer.baseAddress), buffer.count, kCFAllocatorNull, nil, 0, buffer.count, 0, &bufferData)
+        status = CMBlockBufferCreateWithMemoryBlock(allocator: nil, memoryBlock: UnsafeMutablePointer<UInt8>(mutating: buffer.baseAddress), blockLength: buffer.count, blockAllocator: kCFAllocatorNull, customBlockSource: nil, offsetToData: 0, dataLength: buffer.count, flags: 0, blockBufferOut: &bufferData)
         if status != noErr {
             throw H264Error.cmBlockBufferCreateWithMemoryBlock(status)
         }
 
-        status = CMBlockBufferAppendBufferReference(_buffer!, bufferData!, 0, buffer.count, 0)
+        status = CMBlockBufferAppendBufferReference(_buffer!, targetBBuf: bufferData!, offsetToData: 0, dataLength: buffer.count, flags: 0)
         if status != noErr {
             throw H264Error.cmBlockBufferAppendBufferReference(status)
         }
@@ -131,10 +131,10 @@ open class NALU {
     open func sampleBuffer(_ fd : CMVideoFormatDescription) throws -> CMSampleBuffer {
         var sampleBuffer : CMSampleBuffer?
         var timingInfo = CMSampleTimingInfo()
-        timingInfo.decodeTimeStamp = kCMTimeInvalid
-        timingInfo.presentationTimeStamp = kCMTimeZero // pts
-        timingInfo.duration = kCMTimeInvalid
-        let status = CMSampleBufferCreateReady(kCFAllocatorDefault, try blockBuffer(), fd, 1, 1, &timingInfo, 0, nil, &sampleBuffer)
+        timingInfo.decodeTimeStamp = CMTime.invalid
+        timingInfo.presentationTimeStamp = CMTime.zero // pts
+        timingInfo.duration = CMTime.invalid
+        let status = CMSampleBufferCreateReady(allocator: kCFAllocatorDefault, dataBuffer: try blockBuffer(), formatDescription: fd, sampleCount: 1, sampleTimingEntryCount: 1, sampleTimingArray: &timingInfo, sampleSizeEntryCount: 0, sampleSizeArray: nil, sampleBufferOut: &sampleBuffer)
         if status != noErr {
             throw H264Error.cmSampleBufferCreateReady(status)
         }

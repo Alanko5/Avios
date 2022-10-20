@@ -70,7 +70,7 @@ open class H264Decoder {
         invalidateVideo()
         pthread_cond_destroy(&cond)
         pthread_mutex_destroy(&mutex)
-        buffer?.deallocate(capacity: bufsize)
+        buffer = nil
     }
     
     open func decode(_ data: UnsafePointer<UInt8>, length: Int) throws -> AviosImage {
@@ -122,7 +122,7 @@ open class H264Decoder {
         processingImage = nil
         processingError = nil
         pthread_mutex_unlock(&mutex)
-        let status = VTDecompressionSessionDecodeFrame(videoSession, sampleBuffer, [._EnableAsynchronousDecompression], nil, &infoFlags)
+        let status = VTDecompressionSessionDecodeFrame(videoSession, sampleBuffer: sampleBuffer, flags: [._EnableAsynchronousDecompression], frameRefcon: nil, infoFlagsOut: &infoFlags)
         if status != noErr {
             throw H264Error.vtDecompressionSessionDecodeFrame(status)
         }
@@ -177,7 +177,7 @@ open class H264Decoder {
             while image.stride * image.height > bufsize {
                 bufsize *= 2
             }
-            buffer?.deallocate(capacity: bufsize)
+            
             buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufsize)
         }
         memcpy(buffer, CVPixelBufferGetBaseAddress(pixelBuffer), image.stride * image.height)
@@ -199,7 +199,7 @@ open class H264Decoder {
         var _formatDescription : CMFormatDescription?
         let parameterSetPointers : [UnsafePointer<UInt8>] = [ pps!.buffer.baseAddress!, sps!.buffer.baseAddress! ]
         let parameterSetSizes : [Int] = [ pps!.buffer.count, sps!.buffer.count ]
-        var status = CMVideoFormatDescriptionCreateFromH264ParameterSets(kCFAllocatorDefault, 2, parameterSetPointers, parameterSetSizes, 4, &_formatDescription);
+        var status = CMVideoFormatDescriptionCreateFromH264ParameterSets(allocator: kCFAllocatorDefault, parameterSetCount: 2, parameterSetPointers: parameterSetPointers, parameterSetSizes: parameterSetSizes, nalUnitHeaderLength: 4, formatDescriptionOut: &_formatDescription);
         if status != noErr {
             throw H264Error.cmVideoFormatDescriptionCreateFromH264ParameterSets(status)
         }
@@ -216,10 +216,10 @@ open class H264Decoder {
         destinationPixelBufferAttributes.setValue(NSNumber(value: kCVPixelFormatType_32BGRA as UInt32), forKey: kCVPixelBufferPixelFormatTypeKey as String)
 
         var outputCallback = VTDecompressionOutputCallbackRecord()
-        outputCallback.decompressionOutputCallback = callback as? VTDecompressionOutputCallback
+        outputCallback.decompressionOutputCallback = callback
         outputCallback.decompressionOutputRefCon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
        
-        status = VTDecompressionSessionCreate(nil, formatDescription, decoderParameters, destinationPixelBufferAttributes, &outputCallback, &videoSessionM)
+        status = VTDecompressionSessionCreate(allocator: nil, formatDescription: formatDescription, decoderSpecification: decoderParameters, imageBufferAttributes: destinationPixelBufferAttributes, outputCallback: &outputCallback, decompressionSessionOut: &videoSessionM)
         if status != noErr {
             throw H264Error.vtDecompressionSessionCreate(status)
         }
@@ -234,9 +234,23 @@ open class H264Decoder {
     open func decode(_ data: Data) throws -> AviosImage {
         return try decode((data as NSData).bytes.bindMemory(to: UInt8.self, capacity: data.count), length: data.count)
     }
-}
-
-private func callback(_ decompressionOutputRefCon: UnsafeMutableRawPointer, sourceFrameRefCon: UnsafeMutableRawPointer, status: OSStatus, infoFlags: VTDecodeInfoFlags, imageBuffer: CVImageBuffer?, presentationTimeStamp: CMTime, presentationDuration: CMTime){
-    unsafeBitCast(decompressionOutputRefCon, to: H264Decoder.self).decompressionOutputCallback(sourceFrameRefCon, status: status, infoFlags: infoFlags, imageBuffer: imageBuffer, presentationTimeStamp: presentationTimeStamp, presentationDuration: presentationDuration)
+    
+    private var callback: VTDecompressionOutputCallback = {(
+            decompressionOutputRefCon: UnsafeMutableRawPointer?,
+            sourceFrameRefCon: UnsafeMutableRawPointer?,
+            status: OSStatus,
+            infoFlags: VTDecodeInfoFlags,
+            imageBuffer: CVBuffer?,
+            presentationTimeStamp: CMTime,
+            duration: CMTime) in
+        guard let sourceFrameRefCon = sourceFrameRefCon else { return }
+        unsafeBitCast(decompressionOutputRefCon,
+                      to: H264Decoder.self).decompressionOutputCallback(sourceFrameRefCon,
+                                                                        status: status,
+                                                                        infoFlags: infoFlags,
+                                                                        imageBuffer: imageBuffer,
+                                                                        presentationTimeStamp: presentationTimeStamp,
+                                                                        presentationDuration: duration)
+    }
 }
 
