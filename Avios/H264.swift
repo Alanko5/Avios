@@ -188,6 +188,7 @@ open class H264Decoder {
     fileprivate func invalidateVideo() {
         formatDescription = nil
         if videoSession != nil {
+            VTDecompressionSessionWaitForAsynchronousFrames(videoSession)
             VTDecompressionSessionInvalidate(videoSession)
             videoSession = nil
         }
@@ -206,6 +207,7 @@ open class H264Decoder {
         formatDescription = _formatDescription!
 
         if videoSession != nil {
+            VTDecompressionSessionWaitForAsynchronousFrames(videoSession)
             VTDecompressionSessionInvalidate(videoSession)
             videoSession = nil
         }
